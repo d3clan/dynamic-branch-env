@@ -173,12 +173,12 @@ flowchart LR
         PR[Pull Request]
     end
 
-    subgraph "API Gateway"
-        EP[/github/webhook]
+    subgraph API_Gateway[API Gateway]
+        EP["POST /webhook"]
     end
 
-    subgraph "Webhook Handler"
-        WH[Validate Signature<br/>Parse Event]
+    subgraph Webhook_Handler[Webhook Handler]
+        WH["Validate Signature & Parse Event"]
     end
 
     subgraph EventBridge
@@ -188,7 +188,7 @@ flowchart LR
         R3[Rule: PR Closed]
     end
 
-    subgraph "Environment Controller"
+    subgraph Environment_Controller[Environment Controller]
         CREATE[CREATE Action]
         UPDATE[UPDATE Action]
         DESTROY[DESTROY Action]
