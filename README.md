@@ -1,6 +1,6 @@
 # Virtual Environment Platform
 
-[[CI](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml)
+[![CI](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml)
 
 > **Note:** Replace `YOUR_ORG` in the badge URL with your GitHub organization/username.
 
