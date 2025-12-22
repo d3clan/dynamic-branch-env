@@ -51,11 +51,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure mock AWS credentials
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = AKIAIOSFODNN7EXAMPLE" >> ~/.aws/credentials
+          echo "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "region = us-west-2" >> ~/.aws/config
+
       - name: CDK Synth
-        run: npx cdk synth --quiet
+        run: npx cdk synth --quiet --no-lookups
         env:
           CDK_DEFAULT_ACCOUNT: '123456789012'
           CDK_DEFAULT_REGION: 'us-west-2'
+          AWS_REGION: 'us-west-2'
 
   security-scan:
     name: Security Scan
