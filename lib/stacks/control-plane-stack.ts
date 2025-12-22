@@ -266,6 +266,25 @@ export class ControlPlaneStack extends cdk.Stack {
       NODE_OPTIONS: '--enable-source-maps',
     };
 
+    // Create log groups for Lambda functions
+    const webhookHandlerLogGroup = new logs.LogGroup(this, 'WebhookHandlerLogGroup', {
+      logGroupName: '/aws/lambda/virtual-env-webhook-handler',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const environmentControllerLogGroup = new logs.LogGroup(this, 'EnvironmentControllerLogGroup', {
+      logGroupName: '/aws/lambda/virtual-env-controller',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const cleanupHandlerLogGroup = new logs.LogGroup(this, 'CleanupHandlerLogGroup', {
+      logGroupName: '/aws/lambda/virtual-env-cleanup-handler',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Webhook Handler Lambda
     this.webhookHandler = new lambdaNodejs.NodejsFunction(this, 'WebhookHandler', {
       functionName: 'virtual-env-webhook-handler',
@@ -282,7 +301,7 @@ export class ControlPlaneStack extends cdk.Stack {
         sourceMap: true,
         externalModules: ['@aws-sdk/*'],
       },
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logGroup: webhookHandlerLogGroup,
     });
 
     // Environment Controller Lambda (VPC-enabled for ECS/ALB access)
@@ -304,7 +323,7 @@ export class ControlPlaneStack extends cdk.Stack {
         sourceMap: true,
         externalModules: ['@aws-sdk/*'],
       },
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logGroup: environmentControllerLogGroup,
     });
 
     // Cleanup Handler Lambda
@@ -323,7 +342,7 @@ export class ControlPlaneStack extends cdk.Stack {
         sourceMap: true,
         externalModules: ['@aws-sdk/*'],
       },
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logGroup: cleanupHandlerLogGroup,
     });
 
     // =========================================================================
