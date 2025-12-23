@@ -3,6 +3,7 @@ import {
   DescribeRulesCommand,
   ModifyRuleCommand,
   DescribeTargetHealthCommand,
+  RuleCondition,
 } from '@aws-sdk/client-elastic-load-balancing-v2';
 
 const client = new ElasticLoadBalancingV2Client({
@@ -73,7 +74,7 @@ export async function updateRulePathPattern(
   pathPattern: string,
   headerValue?: string,
 ): Promise<void> {
-  const conditions = [
+  const conditions: RuleCondition[] = [
     {
       Field: 'path-pattern',
       Values: [pathPattern],
@@ -87,7 +88,7 @@ export async function updateRulePathPattern(
         HttpHeaderName: 'x-virtual-env-id',
         Values: [headerValue],
       },
-    } as any);
+    });
   }
 
   await client.send(

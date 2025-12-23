@@ -32,18 +32,19 @@ export async function POST(request: Request) {
       deployedBy: session.user?.name || session.user?.email,
       deployedAt: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deploying CloudFront function:', error);
 
     // Handle specific CloudFront errors
-    if (error.name === 'PreconditionFailed') {
+    const errorName = error instanceof Error ? error.name : '';
+    if (errorName === 'PreconditionFailed') {
       return NextResponse.json(
         { error: 'The function has been modified. Please refresh and try again.' },
         { status: 409 },
       );
     }
 
-    if (error.name === 'InvalidIfMatchVersion') {
+    if (errorName === 'InvalidIfMatchVersion') {
       return NextResponse.json(
         { error: 'Version mismatch. Please refresh and try again.' },
         { status: 409 },

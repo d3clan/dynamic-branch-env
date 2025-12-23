@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 
@@ -20,10 +21,12 @@ export function Header() {
             <>
               <div className="flex items-center gap-2">
                 {session.user.image && (
-                  <img
+                  <Image
                     src={session.user.image}
                     alt={session.user.name || 'User'}
-                    className="w-8 h-8 rounded-full"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
                   />
                 )}
                 <span className="text-sm text-gray-700">

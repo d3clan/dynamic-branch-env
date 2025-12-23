@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
@@ -64,7 +64,7 @@ export default function EnvironmentDetailPage() {
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchEnvironment = async () => {
+  const fetchEnvironment = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/environments/${envId}`);
@@ -84,11 +84,11 @@ export default function EnvironmentDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [envId]);
 
   useEffect(() => {
     fetchEnvironment();
-  }, [envId]);
+  }, [fetchEnvironment]);
 
   const handleDelete = async () => {
     try {
