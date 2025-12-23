@@ -2,13 +2,13 @@
 import * as cdk from 'aws-cdk-lib';
 import { DEFAULT_CONFIG } from '../lib/config/environment';
 import { ControlPlaneStack } from '../lib/stacks/control-plane-stack';
+import { DashboardStack } from '../lib/stacks/dashboard-stack';
 import { DnsCertificateStack } from '../lib/stacks/dns-certificate-stack';
 import { EcsClusterStack } from '../lib/stacks/ecs-cluster-stack';
 import { EdgeStack } from '../lib/stacks/edge-stack';
 import { NetworkStack } from '../lib/stacks/network-stack';
 import { ObservabilityStack } from '../lib/stacks/observability-stack';
 import { RoutingStack } from '../lib/stacks/routing-stack';
-import { DashboardStack } from '../lib/stacks/dashboard-stack';
 
 const app = new cdk.App();
 

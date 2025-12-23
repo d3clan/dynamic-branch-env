@@ -9,8 +9,8 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix"
+    "lint": "eslint . --ext .ts --ignore-pattern dashboard/",
+    "lint:fix": "eslint . --ext .ts --ignore-pattern dashboard/ --fix"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",

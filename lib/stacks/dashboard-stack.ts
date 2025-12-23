@@ -125,12 +125,12 @@ export class DashboardStack extends cdk.Stack {
       description: 'Secrets for Virtual Environment Dashboard',
       secretObjectValue: {
         GITHUB_CLIENT_ID: cdk.SecretValue.unsafePlainText(
-          props.githubOAuthClientId || 'PLACEHOLDER_CLIENT_ID'
+          props.githubOAuthClientId || 'PLACEHOLDER_CLIENT_ID',
         ),
         GITHUB_CLIENT_SECRET: cdk.SecretValue.unsafePlainText('PLACEHOLDER_CLIENT_SECRET'),
         NEXTAUTH_SECRET: cdk.SecretValue.unsafePlainText(
           // Generate a random string for NextAuth
-          cdk.Names.uniqueId(this).substring(0, 32)
+          cdk.Names.uniqueId(this).substring(0, 32),
         ),
       },
     });
@@ -156,7 +156,7 @@ export class DashboardStack extends cdk.Stack {
     });
 
     // Add container
-    const container = taskDefinition.addContainer('dashboard', {
+    taskDefinition.addContainer('dashboard', {
       image: ecs.ContainerImage.fromEcrRepository(this.repository, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         logGroup,
@@ -215,7 +215,7 @@ export class DashboardStack extends cdk.Stack {
           `${props.routingConfigTableArn}/index/*`,
           props.prioritiesTableArn,
         ],
-      })
+      }),
     );
 
     // ALB read/write permissions (for rule modifications)
@@ -228,7 +228,7 @@ export class DashboardStack extends cdk.Stack {
           'elasticloadbalancing:DescribeTargetHealth',
         ],
         resources: ['*'], // Scope down in production
-      })
+      }),
     );
 
     // CloudFront function read/write permissions
@@ -244,7 +244,7 @@ export class DashboardStack extends cdk.Stack {
         resources: [
           `arn:aws:cloudfront::${this.account}:function/${props.cloudfrontFunctionName}`,
         ],
-      })
+      }),
     );
 
     // ECS read permissions (for service status)
@@ -257,7 +257,7 @@ export class DashboardStack extends cdk.Stack {
           'ecs:ListTasks',
         ],
         resources: ['*'], // Scope down in production
-      })
+      }),
     );
 
     // EventBridge permissions (for triggering destroy)
@@ -268,7 +268,7 @@ export class DashboardStack extends cdk.Stack {
         resources: [
           `arn:aws:events:${this.region}:${this.account}:event-bus/virtual-env-events`,
         ],
-      })
+      }),
     );
 
     // =========================================================================
