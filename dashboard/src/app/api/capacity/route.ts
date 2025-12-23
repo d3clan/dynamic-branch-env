@@ -3,10 +3,35 @@ import { getServerSession } from 'next-auth';
 import { countALBRules } from '@/lib/api/alb';
 import { listEnvironments, countUsedPriorities } from '@/lib/api/dynamodb';
 import { authOptions } from '@/lib/auth/options';
+import { isMockMode, mockCapacity } from '@/lib/mock-data';
 
 const MAX_ALB_RULES = 100; // AWS limit is 100 rules per listener (excluding default)
 
 export async function GET() {
+  // Return mock data in development mode without auth
+  if (isMockMode()) {
+    return NextResponse.json({
+      environments: {
+        total: mockCapacity.environments.total,
+        byStatus: {
+          ACTIVE: mockCapacity.environments.active,
+          PROVISIONING: mockCapacity.environments.provisioning,
+          FAILED: mockCapacity.environments.failed,
+        },
+      },
+      alb: {
+        used: mockCapacity.albRules.used,
+        max: MAX_ALB_RULES,
+        percentage: mockCapacity.albRules.percentage,
+        isWarning: mockCapacity.albRules.percentage >= 70,
+        isCritical: mockCapacity.albRules.percentage >= 90,
+      },
+      priorities: {
+        used: mockCapacity.albRules.used,
+      },
+    });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {

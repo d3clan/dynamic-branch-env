@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getEnvironment, updateEnvironmentTTL } from '@/lib/api/dynamodb';
 import { authOptions } from '@/lib/auth/options';
+import { isMockMode } from '@/lib/mock-data';
 
 const DEFAULT_EXTENSION_HOURS = 24;
 
@@ -9,6 +10,21 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ envId: string }> },
 ) {
+  const { envId } = await params;
+
+  // Mock extend in development mode
+  if (isMockMode()) {
+    const body = await request.json().catch(() => ({}));
+    const extensionHours = body.hours || DEFAULT_EXTENSION_HOURS;
+    const newTtl = Math.floor(Date.now() / 1000) + extensionHours * 60 * 60;
+    return NextResponse.json({
+      message: 'TTL extended successfully (mock)',
+      virtualEnvId: envId,
+      newTtlTimestamp: newTtl,
+      newExpiresAt: new Date(newTtl * 1000).toISOString(),
+    });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -16,7 +32,6 @@ export async function POST(
   }
 
   try {
-    const { envId } = await params;
     const body = await request.json().catch(() => ({}));
     const extensionHours = body.hours || DEFAULT_EXTENSION_HOURS;
 

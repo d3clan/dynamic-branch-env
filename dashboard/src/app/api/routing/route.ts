@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { listRoutingConfigs } from '@/lib/api/dynamodb';
 import { authOptions } from '@/lib/auth/options';
+import { isMockMode, mockRoutingConfigs } from '@/lib/mock-data';
 
 export async function GET() {
+  // Return mock data in development mode without auth
+  if (isMockMode()) {
+    return NextResponse.json({ routingConfigs: mockRoutingConfigs });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {

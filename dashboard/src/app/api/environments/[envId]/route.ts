@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getEnvironment, getRoutingConfigsForEnvironment } from '@/lib/api/dynamodb';
 import { authOptions } from '@/lib/auth/options';
+import { isMockMode, mockEnvironments, mockRoutingConfigs } from '@/lib/mock-data';
 
 const eventBridge = new EventBridgeClient({
   region: process.env.AWS_REGION || 'eu-west-1',
@@ -15,6 +16,18 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ envId: string }> },
 ) {
+  const { envId } = await params;
+
+  // Return mock data in development mode without auth
+  if (isMockMode()) {
+    const environment = mockEnvironments.find((e) => e.virtualEnvId === envId);
+    if (!environment) {
+      return NextResponse.json({ error: 'Environment not found' }, { status: 404 });
+    }
+    const routingConfigs = mockRoutingConfigs.filter((r) => r.virtualEnvId === envId);
+    return NextResponse.json({ environment, routingConfigs });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -22,7 +35,6 @@ export async function GET(
   }
 
   try {
-    const { envId } = await params;
     const [environment, routingConfigs] = await Promise.all([
       getEnvironment(envId),
       getRoutingConfigsForEnvironment(envId),
@@ -52,6 +64,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ envId: string }> },
 ) {
+  const { envId } = await params;
+
+  // Mock delete in development mode
+  if (isMockMode()) {
+    return NextResponse.json({
+      message: 'Environment destroy initiated (mock)',
+      virtualEnvId: envId,
+    });
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -59,7 +81,6 @@ export async function DELETE(
   }
 
   try {
-    const { envId } = await params;
     const environment = await getEnvironment(envId);
 
     if (!environment) {

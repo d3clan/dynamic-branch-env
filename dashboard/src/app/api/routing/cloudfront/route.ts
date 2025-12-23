@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getFunctionCode, getFunctionInfo } from '@/lib/api/cloudfront';
 import { authOptions } from '@/lib/auth/options';
+import { isMockMode, mockCloudFrontFunction } from '@/lib/mock-data';
 
 export async function GET() {
+  // Return mock data in development mode without auth
+  if (isMockMode()) {
+    return NextResponse.json(mockCloudFrontFunction);
+  }
+
   const session = await getServerSession(authOptions);
 
   if (!session) {
