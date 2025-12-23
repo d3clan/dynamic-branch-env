@@ -9,9 +9,11 @@ A serverless AWS CDK infrastructure for PR-scoped ephemeral preview environments
 ## Table of Contents
 
 - [Overview](#overview)
+  - [Design Decisions](#design-decisions)
 - [Architecture](#architecture)
 - [How It Works](#how-it-works)
 - [Development Workflow](#development-workflow)
+- [Management Dashboard](#management-dashboard)
 - [Infrastructure Components](#infrastructure-components)
 - [Deployment](#deployment)
 - [Configuration](#configuration)
@@ -31,6 +33,49 @@ The Virtual Environment Platform solves the challenge of previewing feature bran
 - **Zero Infrastructure Overhead**: Serverless control plane with pay-per-use pricing
 - **Automatic Cleanup**: TTL-based expiration ensures resources don't accumulate
 - **Security-First Design**: Internal ALB with VPC Origins, WAF protection, and secret-based trust
+
+### Design Decisions
+
+#### DEV Environment Only (Not UAT)
+
+This platform is intentionally scoped to **DEV environments only**. While we initially explored extending this capability to UAT, the **data management challenges** proved too complex for the current implementation:
+
+- **Test Data Isolation**: UAT environments require realistic, consistent test data. Managing isolated datasets per PR would require sophisticated data seeding, masking, and teardown procedures.
+- **Database State**: Preview environments share the underlying DEV database. UAT would require either:
+  - Per-environment database instances (costly, slow to provision)
+  - Schema-level isolation (complex migration management)
+  - Synthetic data generation (significant development effort)
+- **Data Dependencies**: Many services have complex data relationships that are difficult to replicate in ephemeral environments.
+- **Compliance Concerns**: UAT often uses production-like data with PII, requiring additional security controls.
+
+**Recommendation**: Use this platform for functional testing and code review in DEV. Continue using dedicated, long-lived UAT environments for integration testing with realistic data scenarios.
+
+#### Third-Party API Integration
+
+If your services integrate with third-party APIs, you can configure a **common DNS entry** to route all preview environments through a shared endpoint:
+
+```
+# Instead of each PR calling the third-party directly:
+pr-123.dev.example.com → third-party-api.com ❌
+
+# Route through a common internal endpoint:
+pr-123.dev.example.com → api-proxy.internal.example.com → third-party-api.com ✓
+```
+
+**Benefits of this approach**:
+- **Single IP Allowlist**: Third-party vendors only need to allowlist one endpoint
+- **Rate Limit Management**: Centralised control over API quotas across all preview environments
+- **Credential Management**: API keys stored once, not duplicated per environment
+- **Mock/Stub Support**: Easily swap the proxy target for testing scenarios
+
+**Implementation**: Configure your services to use environment variables for external API endpoints:
+
+```typescript
+// In your application code
+const apiEndpoint = process.env.THIRD_PARTY_API_URL || 'https://api-proxy.internal.example.com';
+```
+
+Then set `THIRD_PARTY_API_URL` in your ECS task definition to point to your internal proxy service.
 
 ---
 
@@ -377,6 +422,240 @@ flowchart LR
 
 ---
 
+## Management Dashboard
+
+The platform includes a web-based management dashboard for monitoring and managing preview environments. The dashboard is built with Next.js 15 and deployed to ECS Fargate alongside the preview services.
+
+### Dashboard Features
+
+| Feature | Description |
+|---------|-------------|
+| **Environment List** | View all active preview environments with status, repository, branch, and TTL |
+| **Environment Details** | Detailed view with services, health status, and routing configuration |
+| **TTL Management** | Extend environment TTL with one click |
+| **Quick Destroy** | Manually destroy environments that are no longer needed |
+| **Routing Editor** | Edit ALB path patterns for each service |
+| **CloudFront Function Editor** | View and modify the header injection function code |
+| **Capacity Dashboard** | Monitor ALB rule usage with warning thresholds |
+
+### Dashboard Architecture
+
+```mermaid
+flowchart TB
+    subgraph Internet
+        User[Developer/Admin]
+    end
+
+    subgraph AWS["AWS Cloud"]
+        subgraph Edge["Edge Layer"]
+            CF[CloudFront]
+        end
+
+        subgraph Primary["Primary Region"]
+            ALB[Internal ALB]
+
+            subgraph ECS["ECS Cluster"]
+                Dashboard[Dashboard Service<br/>Next.js]
+            end
+
+            subgraph Data["Data Layer"]
+                DDB[(DynamoDB)]
+                SM[Secrets Manager]
+            end
+
+            CFF[CloudFront Function]
+        end
+
+        GitHub[GitHub OAuth]
+    end
+
+    User -->|HTTPS| CF
+    CF -->|dashboard.domain| ALB
+    ALB --> Dashboard
+
+    Dashboard -->|Read/Write| DDB
+    Dashboard -->|Auth Secrets| SM
+    Dashboard -->|Modify| CFF
+    Dashboard <-->|OAuth| GitHub
+```
+
+### Dashboard Pages
+
+#### Environments (`/environments`)
+
+View and manage all preview environments:
+- Filter by status (ACTIVE, CREATING, FAILED, etc.)
+- Quick actions: Preview URL, Destroy
+- TTL countdown with warning for expiring environments
+
+#### Environment Detail (`/environments/[envId]`)
+
+Detailed view of a specific environment:
+- Status and metadata (repository, branch, PR number)
+- TTL with extend functionality
+- Services list with health status
+- Routing configuration
+
+#### Routing (`/routing`)
+
+Manage ALB routing rules:
+- View all active routing configurations
+- Edit path patterns per service
+- Link to CloudFront function editor
+
+#### CloudFront Function Editor (`/routing/cloudfront`)
+
+Edit the header injection function:
+- Syntax-highlighted code editor
+- Deploy changes directly to LIVE stage
+- View last modified timestamp
+
+#### Capacity (`/capacity`)
+
+Monitor platform capacity:
+- ALB rule usage gauge (warning at 70%, critical at 90%)
+- Environment count by status
+- Priority allocation tracking
+
+### Dashboard Setup
+
+#### Prerequisites
+
+1. GitHub OAuth App credentials
+2. Dashboard Docker image built and pushed to ECR
+3. CDK Dashboard stack deployed
+
+#### Step 1: Create GitHub OAuth App
+
+1. Go to **GitHub** → **Settings** → **Developer settings** → **OAuth Apps**
+2. Click **New OAuth App**
+3. Fill in the details:
+   - **Application name**: `Virtual Env Dashboard`
+   - **Homepage URL**: `https://dashboard.dev.example.com`
+   - **Authorization callback URL**: `https://dashboard.dev.example.com/api/auth/callback/github`
+4. Click **Register application**
+5. Note the **Client ID**
+6. Generate a new **Client Secret** and save it securely
+
+#### Step 2: Configure Secrets
+
+Update the dashboard secrets in AWS Secrets Manager:
+
+```bash
+# Get the secret ARN from CDK output
+SECRET_ARN=$(aws cloudformation describe-stacks \
+  --stack-name VirtualEnv-Dashboard \
+  --query 'Stacks[0].Outputs[?OutputKey==`SecretArn`].OutputValue' \
+  --output text)
+
+# Update the secret with real values
+aws secretsmanager put-secret-value \
+  --secret-id "$SECRET_ARN" \
+  --secret-string '{
+    "GITHUB_CLIENT_ID": "your_client_id_here",
+    "GITHUB_CLIENT_SECRET": "your_client_secret_here",
+    "NEXTAUTH_SECRET": "generate_a_32_char_random_string"
+  }'
+```
+
+Generate a secure NEXTAUTH_SECRET:
+
+```bash
+openssl rand -base64 32
+```
+
+#### Step 3: Build and Push Docker Image
+
+```bash
+# Navigate to dashboard directory
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Build the application
+npm run build
+
+# Get ECR repository URI from CDK output
+REPO_URI=$(aws cloudformation describe-stacks \
+  --stack-name VirtualEnv-Dashboard \
+  --query 'Stacks[0].Outputs[?OutputKey==`RepositoryUri`].OutputValue' \
+  --output text)
+
+# Authenticate with ECR
+aws ecr get-login-password --region eu-west-1 | \
+  docker login --username AWS --password-stdin "$REPO_URI"
+
+# Build Docker image
+docker build -t virtual-env-dashboard .
+
+# Tag and push
+docker tag virtual-env-dashboard:latest "$REPO_URI:latest"
+docker push "$REPO_URI:latest"
+```
+
+#### Step 4: Deploy the Dashboard Stack
+
+```bash
+# Deploy with GitHub OAuth context variables
+npx cdk deploy VirtualEnv-Dashboard \
+  --context githubOAuthClientId=your_client_id \
+  --context githubOrgName=your_org_name
+```
+
+#### Step 5: Force ECS Deployment
+
+After pushing a new image, force a new deployment:
+
+```bash
+aws ecs update-service \
+  --cluster virtual-env-cluster \
+  --service virtual-env-dashboard \
+  --force-new-deployment
+```
+
+### Restricting Access
+
+The dashboard uses GitHub OAuth with optional organization membership restriction:
+
+1. **Set `GITHUB_ORG_NAME`**: Only members of this organization can access
+2. **OAuth Scopes**: `read:org` and `read:user` are requested
+3. **Membership Check**: Validates active membership during sign-in
+
+To restrict to a specific org, set the context variable during deployment:
+
+```bash
+npx cdk deploy VirtualEnv-Dashboard \
+  --context githubOrgName=my-company
+```
+
+### Local Development
+
+Run the dashboard locally for development:
+
+```bash
+cd dashboard
+
+# Create .env.local from example
+cp .env.example .env.local
+
+# Edit .env.local with your values
+# - GITHUB_CLIENT_ID
+# - GITHUB_CLIENT_SECRET
+# - NEXTAUTH_SECRET
+# - AWS credentials
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+```
+
+Access at `http://localhost:3000`
+
+---
+
 ## Infrastructure Components
 
 ### Stacks Overview
@@ -389,6 +668,7 @@ flowchart LR
 | `VirtualEnv-EcsCluster` | Primary | Shared ECS Fargate cluster |
 | `VirtualEnv-Edge` | us-east-1 | CloudFront, WAF, CloudFront Function |
 | `VirtualEnv-ControlPlane` | Primary | Lambda functions, DynamoDB, EventBridge |
+| `VirtualEnv-Dashboard` | Primary | Management dashboard (Next.js on ECS) |
 | `VirtualEnv-Observability` | Primary | CloudWatch dashboards, alarms |
 
 ### DynamoDB Tables
@@ -444,7 +724,7 @@ Set your domain in `cdk.json` or via context:
 {
   "context": {
     "domainName": "dev.yourcompany.com",
-    "primaryRegion": "us-west-2",
+    "primaryRegion": "eu-west-1",
     "edgeRegion": "us-east-1"
   }
 }
@@ -461,7 +741,7 @@ npm run build
 
 # Bootstrap CDK (if not already done)
 npx cdk bootstrap aws://ACCOUNT_ID/us-east-1
-npx cdk bootstrap aws://ACCOUNT_ID/us-west-2
+npx cdk bootstrap aws://ACCOUNT_ID/eu-west-1
 
 # Deploy all stacks
 npx cdk deploy --all
@@ -473,8 +753,11 @@ npx cdk deploy VirtualEnv-Routing
 npx cdk deploy VirtualEnv-EcsCluster
 npx cdk deploy VirtualEnv-Edge
 npx cdk deploy VirtualEnv-ControlPlane
+npx cdk deploy VirtualEnv-Dashboard  # Optional - see Dashboard Setup section
 npx cdk deploy VirtualEnv-Observability
 ```
+
+> **Note**: The Dashboard stack requires additional setup (GitHub OAuth, Docker image). See the [Management Dashboard](#management-dashboard) section for complete setup instructions.
 
 ### GitHub App Setup
 
@@ -499,8 +782,8 @@ Configure in `lib/config/environment.ts`:
 export const DEFAULT_CONFIG = {
   domainName: 'dev.example.com',      // Your preview domain
   ttlHours: 24,                        // Environment TTL
-  primaryRegion: 'us-west-2',          // Main infrastructure region
-  edgeRegion: 'us-east-1',             // CloudFront/WAF region
+  primaryRegion: 'eu-west-1',          // Main infrastructure region
+  edgeRegion: 'us-east-1',             // CloudFront/WAF region (must be us-east-1)
 };
 ```
 
@@ -600,6 +883,9 @@ AWS ALB has a limit of 100 listener rules. Budget carefully:
 | 502 errors | Target group health checks, ECS task status |
 | Slow provisioning | EventBridge delivery, Lambda concurrency |
 | Cleanup not happening | DynamoDB TTL configuration, cleanup-handler logs |
+| Dashboard login fails | GitHub OAuth credentials in Secrets Manager, callback URL |
+| Dashboard shows "Access Denied" | User org membership, GITHUB_ORG_NAME configuration |
+| Dashboard can't read data | ECS task role IAM permissions, DynamoDB table names |
 
 ---
 

@@ -8,6 +8,7 @@ import { EdgeStack } from '../lib/stacks/edge-stack';
 import { NetworkStack } from '../lib/stacks/network-stack';
 import { ObservabilityStack } from '../lib/stacks/observability-stack';
 import { RoutingStack } from '../lib/stacks/routing-stack';
+import { DashboardStack } from '../lib/stacks/dashboard-stack';
 
 const app = new cdk.App();
 
@@ -112,7 +113,29 @@ controlPlaneStack.addDependency(routingStack);
 controlPlaneStack.addDependency(ecsClusterStack);
 controlPlaneStack.addDependency(edgeStack);
 
-// 7. Observability Stack
+// 7. Dashboard Stack
+const dashboardStack = new DashboardStack(app, 'VirtualEnv-Dashboard', {
+  env: primaryEnv,
+  vpc: networkStack.vpc,
+  cluster: ecsClusterStack.cluster,
+  ecsSecurityGroup: networkStack.ecsSecurityGroup,
+  httpsListener: routingStack.httpsListener,
+  environmentsTableArn: controlPlaneStack.environmentsTable.tableArn,
+  routingConfigTableArn: controlPlaneStack.routingConfigTable.tableArn,
+  prioritiesTableArn: controlPlaneStack.prioritiesTable.tableArn,
+  distributionId: edgeStack.distribution.distributionId,
+  cloudfrontFunctionName: 'virtual-env-header-injection',
+  albListenerArn: routingStack.httpsListener.listenerArn,
+  domainName,
+  githubOAuthClientId: app.node.tryGetContext('githubOAuthClientId'),
+  githubOrgName: app.node.tryGetContext('githubOrgName'),
+  crossRegionReferences: true,
+  description: 'Virtual Environment Platform - Management Dashboard',
+});
+dashboardStack.addDependency(controlPlaneStack);
+dashboardStack.addDependency(edgeStack);
+
+// 8. Observability Stack
 const observabilityStack = new ObservabilityStack(app, 'VirtualEnv-Observability', {
   env: primaryEnv,
   webhookHandler: controlPlaneStack.webhookHandler,
