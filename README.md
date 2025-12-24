@@ -1,9 +1,5 @@
 # Virtual Environment Platform
 
-[![CI](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/dynamic-branch-env/actions/workflows/ci.yml)
-
-> **Note:** Replace `YOUR_ORG` in the badge URL with your GitHub organization/username.
-
 A serverless AWS CDK infrastructure for PR-scoped ephemeral preview environments. This platform enables true continuous delivery by automatically provisioning isolated environments for each pull request, allowing developers and stakeholders to preview changes before merging to trunk.
 
 ## Table of Contents
